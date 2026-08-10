@@ -26,13 +26,27 @@ export type LoginUser = {
 export type TradesmanProfile = {
   _id: string;
   mainSkill?: string;
+  extraSkills?: string[];
   homeArea?: string;
   travelRange?: string;
   pitch?: string;
   typicalRate?: { amount: number; unit: string };
+  workPhotos?: { public_id?: string; url?: string }[];
   verificationStatus?: "pending" | "verified" | "rejected";
   isLive?: boolean;
   isVip?: boolean;
+  ratingAverage?: number;
+  ratingCount?: number;
+  jobsCount?: number;
+  contactChangeRequest?: {
+    requestedName?: string;
+    requestedPhoneNumber?: string;
+    reason?: string;
+    status?: "none" | "pending" | "resolved";
+    requestedAt?: string | null;
+  };
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type User = {
@@ -44,9 +58,13 @@ export type User = {
   phoneNumber?: string;
   role: "client" | "tradesman" | "admin";
   area?: string;
+  isEmailVerified?: boolean;
+  isProfileComplete?: boolean;
   isBlocked?: boolean;
-  profileImage?: { url?: string };
+  profileImage?: { public_id?: string; url?: string };
   tradesmanProfile?: TradesmanProfile | null;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type DashboardData = {
