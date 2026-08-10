@@ -1,10 +1,11 @@
 import axios from "axios";
 import type { Advertisement, ApiResponse, DashboardData, LoginUser, PaginationMeta, User } from "./types";
 
-const configuredUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTPUBLICBASEURL || "http://localhost:5000";
-const baseURL = configuredUrl.replace(/\/$/, "").endsWith("/api/v1")
+const configuredUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://187.77.187.56:5056";
+const serverBaseURL = configuredUrl.replace(/\/$/, "").endsWith("/api/v1")
   ? configuredUrl.replace(/\/$/, "")
   : `${configuredUrl.replace(/\/$/, "")}/api/v1`;
+const baseURL = typeof window === "undefined" ? serverBaseURL : "/api/proxy";
 
 export const api = axios.create({ baseURL, timeout: 20000 });
 
