@@ -18,10 +18,13 @@ export type LoginUser = {
   email: string;
   phoneNumber?: string;
   role: string;
+  adminPermissions: AdminPermission[];
   area?: string;
   accessToken: string;
   refreshToken?: string;
 };
+
+export type AdminPermission = "dashboard" | "users" | "advertisements";
 
 export type TradesmanProfile = {
   _id: string;
@@ -56,7 +59,8 @@ export type User = {
   name?: string;
   email: string;
   phoneNumber?: string;
-  role: "client" | "tradesman" | "admin";
+  role: "client" | "tradesman" | "admin" | "super-admin";
+  adminPermissions?: AdminPermission[];
   area?: string;
   isEmailVerified?: boolean;
   isProfileComplete?: boolean;
@@ -65,6 +69,20 @@ export type User = {
   tradesmanProfile?: TradesmanProfile | null;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type Administrator = {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  name?: string;
+  email: string;
+  phoneNumber?: string;
+  role: "admin" | "super-admin";
+  adminPermissions: AdminPermission[];
+  isBlocked: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type DashboardData = {

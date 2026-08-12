@@ -20,7 +20,7 @@ export default function LoginPage() {
     const result = await signIn("credentials", { email: form.get("email"), password: form.get("password"), redirect: false });
     setLoading(false);
     if (result?.error) return toast.error("Invalid admin email or password");
-    toast.success("Welcome back"); router.push("/dashboard"); router.refresh();
+    toast.success("Welcome back"); router.push("/"); router.refresh();
   }
   return <AuthFrame title="Welcome" subtitle="Sign in to continue to your dashboard">
     <form onSubmit={submit} className="space-y-4 text-left">

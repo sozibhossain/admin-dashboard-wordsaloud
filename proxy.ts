@@ -7,7 +7,18 @@ export const proxy = auth((request) => {
     request.nextUrl.pathname.startsWith(path),
   );
   if (!authenticated && !onAuthPage) return NextResponse.redirect(new URL("/login", request.url));
-  if (authenticated && onAuthPage) return NextResponse.redirect(new URL("/dashboard", request.url));
+  if (authenticated && onAuthPage) return NextResponse.redirect(new URL("/", request.url));
+  const role = request.auth?.user.role;
+  const permissions = request.auth?.user.permissions || [];
+  const permissionByPath = {
+    "/dashboard": "dashboard",
+    "/users": "users",
+    "/advertisements": "advertisements",
+  } as const;
+  const requiredEntry = Object.entries(permissionByPath).find(([path]) => request.nextUrl.pathname.startsWith(path));
+  const deniedSection = requiredEntry && role !== "super-admin" && !permissions.includes(requiredEntry[1]);
+  const deniedAdminManagement = request.nextUrl.pathname.startsWith("/administrators") && role !== "super-admin";
+  if (authenticated && (deniedSection || deniedAdminManagement)) return NextResponse.redirect(new URL("/", request.url));
   return NextResponse.next();
 });
 

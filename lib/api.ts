@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Advertisement, ApiResponse, DashboardData, LoginUser, PaginationMeta, User } from "./types";
+import type { AdminPermission, Administrator, Advertisement, ApiResponse, DashboardData, LoginUser, PaginationMeta, User } from "./types";
 
 const configuredUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://187.77.187.56:5056";
 const serverBaseURL = configuredUrl.replace(/\/$/, "").endsWith("/api/v1")
@@ -110,5 +110,33 @@ export async function updateProfile(payload: { firstName: string; lastName: stri
 
 export async function changePassword(payload: { currentPassword: string; newPassword: string; confirmPassword: string }) {
   const { data } = await api.put<ApiResponse<never>>("/user/change-password", payload);
+  return data;
+}
+
+export async function getAdministrators() {
+  const { data } = await api.get<ApiResponse<Administrator[]>>("/admin/administrators");
+  return data.data;
+}
+
+export type AdministratorPayload = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  password: string;
+  role: "admin" | "super-admin";
+  permissions: AdminPermission[];
+};
+
+export async function createAdministrator(payload: AdministratorPayload) {
+  const { data } = await api.post<ApiResponse<Administrator>>("/admin/administrators", payload);
+  return data;
+}
+
+export async function updateAdministrator(
+  adminId: string,
+  payload: { role?: "admin" | "super-admin"; permissions?: AdminPermission[]; isBlocked?: boolean },
+) {
+  const { data } = await api.patch<ApiResponse<Administrator>>(`/admin/administrators/${adminId}`, payload);
   return data;
 }

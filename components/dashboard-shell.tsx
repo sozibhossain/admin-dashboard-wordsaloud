@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, BriefcaseBusiness, Grid2X2, LogOut, Menu, Settings, Users, X } from "lucide-react";
+import { Bell, BriefcaseBusiness, Grid2X2, LogOut, Menu, Settings, ShieldCheck, Users, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,18 +9,25 @@ import { Brand } from "./brand";
 import { cn, initials } from "@/lib/utils";
 
 const links = [
-  { href: "/dashboard", label: "Dashboard Overview", icon: Grid2X2 },
-  { href: "/users", label: "User list", icon: Users },
-  { href: "/advertisements", label: "Advertisement", icon: BriefcaseBusiness },
+  { href: "/dashboard", label: "Dashboard Overview", icon: Grid2X2, permission: "dashboard" },
+  { href: "/users", label: "User list", icon: Users, permission: "users" },
+  { href: "/advertisements", label: "Advertisement", icon: BriefcaseBusiness, permission: "advertisements" },
+  { href: "/administrators", label: "Admin Management", icon: ShieldCheck, superAdminOnly: true },
   { href: "/settings", label: "Setting", icon: Settings },
-];
+] as const;
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const visibleLinks = links.filter((link) => {
+    if ("superAdminOnly" in link) return session?.user.role === "super-admin";
+    if ("permission" in link) return session?.user.role === "super-admin" || session?.user.permissions?.includes(link.permission);
+    return true;
+  });
   return <div className="flex h-full flex-col bg-brand px-5 py-8 text-white">
     <Brand light />
     <nav className="mt-8 space-y-2">
-      {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={onNavigate} className={cn("flex h-12 items-center gap-3 rounded-full px-4 text-[15px] font-medium", pathname.startsWith(href) ? "bg-accent text-white" : "hover:bg-white/10")}><Icon size={21} fill={href === "/dashboard" && pathname.startsWith(href) ? "currentColor" : "none"} />{label}</Link>)}
+      {visibleLinks.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={onNavigate} className={cn("flex h-12 items-center gap-3 rounded-full px-4 text-[15px] font-medium", pathname.startsWith(href) ? "bg-accent text-white" : "hover:bg-white/10")}><Icon size={21} fill={href === "/dashboard" && pathname.startsWith(href) ? "currentColor" : "none"} />{label}</Link>)}
     </nav>
     <Link href="/logout" onClick={onNavigate} className="mt-auto flex h-12 items-center gap-3 rounded-full px-4 text-[15px] font-medium hover:bg-white/10"><LogOut size={22} />Log out</Link>
   </div>;
