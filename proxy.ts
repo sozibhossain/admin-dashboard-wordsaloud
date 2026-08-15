@@ -14,6 +14,11 @@ export const proxy = auth((request) => {
     "/dashboard": "dashboard",
     "/users": "users",
     "/advertisements": "advertisements",
+    "/verification": "verification",
+    "/reviews": "reviews",
+    "/categories": "categories",
+    "/audit-logs": "audit",
+    "/platform-settings": "settings",
   } as const;
   const requiredEntry = Object.entries(permissionByPath).find(([path]) => request.nextUrl.pathname.startsWith(path));
   const deniedSection = requiredEntry && role !== "super-admin" && !permissions.includes(requiredEntry[1]);

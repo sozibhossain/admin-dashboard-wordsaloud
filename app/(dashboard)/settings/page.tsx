@@ -64,7 +64,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeading title="Setting" />
+      <PageHeading title="My Settings" />
       {profile.isLoading ? (
         <Skeleton className="mx-auto h-[650px] max-w-[1300px]" />
       ) : (

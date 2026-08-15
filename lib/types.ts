@@ -24,7 +24,16 @@ export type LoginUser = {
   refreshToken?: string;
 };
 
-export type AdminPermission = "dashboard" | "users" | "advertisements";
+export type AdminPermission =
+  | "dashboard"
+  | "users"
+  | "verification"
+  | "advertisements"
+  | "reviews"
+  | "categories"
+  | "exports"
+  | "audit"
+  | "settings";
 
 export type TradesmanProfile = {
   _id: string;
@@ -36,6 +45,12 @@ export type TradesmanProfile = {
   typicalRate?: { amount: number; unit: string };
   workPhotos?: { public_id?: string; url?: string }[];
   verificationStatus?: "pending" | "verified" | "rejected";
+  verification?: {
+    reviewedBy?: string | null;
+    reviewedAt?: string | null;
+    rejectionReason?: string;
+    submittedAt?: string | null;
+  };
   isLive?: boolean;
   isVip?: boolean;
   ratingAverage?: number;
@@ -90,7 +105,7 @@ export type DashboardData = {
   totalClient: number;
   totalTradesman: number;
   totalAdvertisement: number;
-  monthlyOccupancyRate: { day: string; rate: number }[];
+  dailyTradesmanSignups: { day: string; date: string; count: number }[];
   userRegistrationRate: { month: string; count: number }[];
 };
 
@@ -99,5 +114,69 @@ export type Advertisement = {
   title: string;
   description: string;
   isActive: boolean;
+  media?: { mediaType: "image" | "video" | "none"; public_id?: string; url?: string; width?: number; height?: number; duration?: number };
+  targetUrl?: string;
+  categories?: string[];
+  startDate?: string;
+  endDate?: string | null;
+  priority?: number;
+  advertiser?: { name?: string; email?: string; phone?: string };
+  createdAt: string;
+};
+
+export type Category = {
+  _id: string;
+  name: string;
+  slug: string;
+  icon: string;
+  order: number;
+  isActive: boolean;
+  tradesmanCount: number;
+};
+
+export type PlatformSettings = {
+  _id: string;
+  vipSlotsPerCategory: number;
+  sponsoredRotation: "round-robin" | "priority" | "random";
+  reviewModerationMode: "auto-approve" | "require-review";
+  updatedAt: string;
+};
+
+export type AuditLog = {
+  _id: string;
+  actorName: string;
+  actorEmail: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  summary: string;
+  ip: string;
+  createdAt: string;
+};
+
+export type AdminNotificationData = {
+  unreadCount: number;
+  counts: { verification: number; inquiries: number; reviews: number };
+  items: { id: string; type: string; title: string; message: string; createdAt: string; href: string }[];
+};
+
+export type AdminReview = {
+  _id: string;
+  rating: number;
+  ratingLabel: string;
+  reviewText: string;
+  moderationStatus: "pending" | "approved" | "rejected";
+  moderationNote?: string;
+  reviewer?: { firstName?: string; lastName?: string; email?: string };
+  tradesman?: { user?: { firstName?: string; lastName?: string; email?: string } };
+  createdAt: string;
+};
+
+export type AdInquiry = {
+  _id: string;
+  businessName: string;
+  whatsappPhone: string;
+  tradesToAdvertiseTo: string[];
+  status: "new" | "contacted" | "closed";
   createdAt: string;
 };

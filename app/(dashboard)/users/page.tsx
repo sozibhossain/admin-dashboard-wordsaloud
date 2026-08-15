@@ -1,7 +1,8 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ChevronDown, Eye, Plus, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, Download, Eye, Plus, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { PageHeading } from "@/components/page-heading";
@@ -10,13 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { createVip, deleteUser, getUsers, toggleUserBlock, updateVerification, type VipPayload } from "@/lib/api";
+import { bulkUserAction, createVip, deleteUser, exportUsers, getOptions, getUsers, toggleUserBlock, updateVerification, type VipPayload } from "@/lib/api";
 import type { User } from "@/lib/types";
 import { cn, errorMessage, initials } from "@/lib/utils";
 
 const tabs = [{ key: "all", label: "All Users" }, { key: "client", label: "Client" }, { key: "tradesman", label: "Tradesman" }, { key: "vip", label: "VIP" }];
-const skills = ["Phone Tech", "Computer Tech", "Plumber", "Electrician", "Carpenter", "Joinery", "Mobile Mech", "Painter", "Appliance", "AC Tech", "Tile Man", "Mason", "Glass Man", "Roofer", "Welder/Gate", "Pool Cleaner", "Tree Cutter", "Landscaper", "Auto Body", "Contractor", "Maid Service", "Caterer"];
-
 function nameOf(user: User) { return user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Unnamed member"; }
 
 function VipDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -32,6 +31,7 @@ function VipDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
     queryFn: () => getUsers({ type: "tradesman", page: 1, limit: 1000 }),
     enabled: open,
   });
+  const optionsQuery = useQuery({ queryKey: ["options"], queryFn: getOptions, enabled: open });
   const selectedTradesman = tradesmenQuery.data?.users.find((user) => user._id === selectedId);
   const profile = selectedTradesman?.tradesmanProfile;
   const normalizedSearch = tradesmanSearch.trim().toLowerCase();
@@ -165,7 +165,7 @@ function VipDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
             <Field label="Main Skill">
               <select name="mainSkill" required disabled={!selectedTradesman} defaultValue={profile?.mainSkill || ""} className="form-control">
                 <option value="" disabled>Select a skill</option>
-                {skills.map((skill) => <option key={skill}>{skill}</option>)}
+                {optionsQuery.data?.skills.map((skill) => <option key={skill}>{skill}</option>)}
               </select>
             </Field>
           </div>
@@ -215,17 +215,20 @@ function formatDate(value?: string | null) {
 }
 
 export default function UsersPage() {
-  const client = useQueryClient(); const [type, setType] = useState("all"); const [page, setPage] = useState(1); const [vipOpen, setVipOpen] = useState(false); const [selected, setSelected] = useState<User | null>(null); const limit = 8;
-  const query = useQuery({ queryKey: ["users", type, page], queryFn: () => getUsers({ type, page, limit }), placeholderData: keepPreviousData });
+  const client = useQueryClient(); const { data: session } = useSession(); const [type, setType] = useState("all"); const [page, setPage] = useState(1); const [vipOpen, setVipOpen] = useState(false); const [selected, setSelected] = useState<User | null>(null); const [selectedIds, setSelectedIds] = useState<string[]>([]); const [searchInput, setSearchInput] = useState(""); const [search, setSearch] = useState(""); const limit = 8;
+  const query = useQuery({ queryKey: ["users", type, page, search], queryFn: () => getUsers({ type, page, limit, search }), placeholderData: keepPreviousData });
   const refresh = () => client.invalidateQueries({ queryKey: ["users"] });
   const block = useMutation({ mutationFn: toggleUserBlock, onSuccess: (r) => { toast.success(r.message); refresh(); }, onError: (e) => toast.error(errorMessage(e)) });
   const remove = useMutation({ mutationFn: deleteUser, onSuccess: (r) => { toast.success(r.message); refresh(); }, onError: (e) => toast.error(errorMessage(e)) });
   const verify = useMutation({ mutationFn: ({ id }: { id: string }) => updateVerification(id, "verified"), onSuccess: (r) => { toast.success(r.message); refresh(); }, onError: (e) => toast.error(errorMessage(e)) });
+  const bulk = useMutation({ mutationFn: (action: "block" | "unblock" | "delete") => bulkUserAction({ ids: selectedIds, action }), onSuccess: (r) => { toast.success(r.message); setSelectedIds([]); refresh(); }, onError: (e) => toast.error(errorMessage(e)) });
   function actions(user: User) { return <div className="flex items-center justify-end gap-2"><button title={user.isBlocked ? "Activate user" : "Block user"} aria-label={user.isBlocked ? "Activate user" : "Block user"} className={cn("text-green-600", user.isBlocked && "text-amber-600")} onClick={() => block.mutate(user._id)}><ShieldCheck size={17} /></button>{user.tradesmanProfile?.verificationStatus === "pending" && <button title="Verify tradesman" aria-label="Verify tradesman" className="text-green-600" onClick={() => verify.mutate({ id: user.tradesmanProfile!._id })}><CheckCircle2 size={17} /></button>}<button title="View member" aria-label="View member" className="text-blue-500" onClick={() => setSelected(user)}><Eye size={17} /></button><button title="Delete member" aria-label="Delete member" className="text-red-500" onClick={() => { if (confirm(`Delete ${nameOf(user)}?`)) remove.mutate(user._id); }}><Trash2 size={17} /></button></div>; }
-  return <><PageHeading title="User list" /><div className="mb-4 flex flex-wrap items-center gap-2">{tabs.map((tab) => <button key={tab.key} onClick={() => { setType(tab.key); setPage(1); }} className={cn("h-10 rounded-full border border-black/10 bg-white px-4 text-sm shadow-sm", type === tab.key && "border-brand bg-brand text-white")}>{tab.label}</button>)}{type === "vip" && <Button size="sm" className="ml-auto" onClick={() => setVipOpen(true)}><Plus size={16} />Add Vip Member</Button>}</div>
+  const canExport = session?.user.role === "super-admin" || session?.user.permissions?.includes("exports");
+  const rows = query.data?.users || []; const allSelected = rows.length > 0 && rows.every((user) => selectedIds.includes(user._id));
+  return <><PageHeading title="User List" /><div className="mb-4 space-y-3"><div className="flex flex-wrap items-center gap-2">{tabs.map((tab) => <button key={tab.key} onClick={() => { setType(tab.key); setPage(1); setSelectedIds([]); }} className={cn("h-10 rounded-full border border-black/10 bg-white px-4 text-sm shadow-sm", type === tab.key && "border-brand bg-brand text-white")}>{tab.label}</button>)}{type === "vip" && <Button size="sm" className="ml-auto" onClick={() => setVipOpen(true)}><Plus size={16} />Add VIP Member</Button>}</div><div className="flex flex-wrap gap-2 rounded-lg bg-white p-3 shadow-sm"><form onSubmit={(event) => { event.preventDefault(); setSearch(searchInput.trim()); setPage(1); }} className="flex min-w-[260px] flex-1 gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} /><Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search name, email, phone, or skill" className="pl-9" /></div><Button size="sm">Search</Button></form>{canExport && <Button size="sm" variant="outline" onClick={() => exportUsers({ type, search }).catch((error) => toast.error(errorMessage(error)))}><Download size={15} />Export CSV</Button>}{selectedIds.length > 0 && <><Button size="sm" variant="outline" onClick={() => bulk.mutate("block")}>Block {selectedIds.length}</Button><Button size="sm" variant="outline" onClick={() => bulk.mutate("unblock")}>Activate</Button><Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete ${selectedIds.length} selected users?`)) bulk.mutate("delete"); }}>Delete</Button></>}</div></div>
     <section className="overflow-hidden rounded-lg border border-black/5 bg-white shadow-sm">
-      {query.isLoading ? <div className="space-y-2 p-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div> : <>
-        <div className="hidden md:block"><table className="w-full table-fixed"><thead className="bg-brand-soft text-left"><tr><th className="w-[46%] px-7 py-4">MEMBER</th><th className="w-[28%] px-4 py-4 text-center">TYPE</th><th className="px-7 py-4 text-right">ACTIONS</th></tr></thead><tbody>{query.data?.users.map((user) => <tr key={user._id} className="border-b border-black/5"><td className="px-5 py-[18px]"><div className="flex items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#f0f1f4] text-xs font-bold">{initials(nameOf(user)).slice(0, 1)}</span><div className="min-w-0"><div className="truncate text-sm font-bold">{nameOf(user)}</div><div className="truncate text-sm text-[#a0a7b4]">{user.email}</div></div></div></td><td className="px-4 py-3 text-center"><div className="text-sm font-bold capitalize">{user.role}</div>{user.tradesmanProfile?.mainSkill && <div className="text-[11px] text-muted">{user.tradesmanProfile.mainSkill}</div>}</td><td className="px-7 py-3">{actions(user)}</td></tr>)}</tbody></table></div>
+      {query.isLoading ? <div className="space-y-2 p-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div> : query.isError ? <p className="p-10 text-center text-red-600">{errorMessage(query.error)}</p> : <>
+        <div className="hidden md:block"><table className="w-full table-fixed"><thead className="bg-brand-soft text-left"><tr><th className="w-12 px-5 py-4"><input type="checkbox" checked={allSelected} onChange={() => setSelectedIds(allSelected ? [] : rows.map((user) => user._id))} aria-label="Select all users" /></th><th className="w-[42%] px-4 py-4">MEMBER</th><th className="w-[25%] px-4 py-4 text-center">TYPE</th><th className="px-7 py-4 text-right">ACTIONS</th></tr></thead><tbody>{rows.map((user) => <tr key={user._id} className="border-b border-black/5"><td className="px-5 py-3"><input type="checkbox" checked={selectedIds.includes(user._id)} onChange={() => setSelectedIds((current) => current.includes(user._id) ? current.filter((id) => id !== user._id) : [...current, user._id])} aria-label={`Select ${nameOf(user)}`} /></td><td className="px-4 py-[18px]"><div className="flex items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#f0f1f4] text-xs font-bold">{initials(nameOf(user)).slice(0, 1)}</span><div className="min-w-0"><div className="truncate text-sm font-bold">{nameOf(user)}</div><div className="truncate text-sm text-[#a0a7b4]">{user.email}</div></div></div></td><td className="px-4 py-3 text-center"><div className="text-sm font-bold capitalize">{user.role}</div>{user.tradesmanProfile?.mainSkill && <div className="text-[11px] text-muted">{user.tradesmanProfile.mainSkill}</div>}</td><td className="px-7 py-3">{actions(user)}</td></tr>)}</tbody></table></div>
         <div className="divide-y divide-black/5 md:hidden">{query.data?.users.map((user) => <article key={user._id} className="p-4"><div className="flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#f0f1f4] text-xs font-bold">{initials(nameOf(user)).slice(0, 1)}</span><div className="min-w-0 flex-1"><h3 className="truncate text-sm font-bold">{nameOf(user)}</h3><p className="truncate text-xs text-muted">{user.email}</p><p className="mt-1 text-xs capitalize">{user.role}</p></div>{actions(user)}</div></article>)}</div>
         {!query.data?.users.length && <p className="p-12 text-center text-sm text-muted">No members found.</p>}<Pagination page={query.data?.meta.page || 1} totalPages={query.data?.meta.totalPages || 1} total={query.data?.meta.total || 0} pageSize={limit} onPage={setPage} />
       </>}

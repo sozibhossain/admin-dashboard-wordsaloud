@@ -22,7 +22,13 @@ import { cn, errorMessage, initials } from "@/lib/utils";
 const permissionOptions: { value: AdminPermission; label: string; description: string }[] = [
   { value: "dashboard", label: "Dashboard overview", description: "View platform totals and registration activity." },
   { value: "users", label: "User management", description: "View, verify, block, delete, and manage VIP members." },
+  { value: "verification", label: "Verification queue", description: "Approve or reject tradesman verification requests." },
   { value: "advertisements", label: "Advertisements", description: "Create, edit, activate, and remove advertisements." },
+  { value: "reviews", label: "Review moderation", description: "Approve or reject customer reviews." },
+  { value: "categories", label: "Trade categories", description: "Add, edit, reorder, and deactivate categories." },
+  { value: "exports", label: "Data exports", description: "Download user and tradesman data as CSV." },
+  { value: "audit", label: "Audit log", description: "View administrator activity history." },
+  { value: "settings", label: "Platform settings", description: "Change VIP, advertising, and moderation defaults." },
 ];
 
 const allPermissions = permissionOptions.map((permission) => permission.value);

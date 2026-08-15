@@ -6,9 +6,9 @@ declare module "next-auth" {
     accessToken: string;
     user: { _id: string; role: string; permissions: AdminPermission[]; name?: string | null; email?: string | null; image?: string | null };
   }
-  interface User { role: string; permissions: AdminPermission[]; accessToken: string }
+  interface User { role: string; permissions: AdminPermission[]; accessToken: string; refreshToken: string }
 }
 
 declare module "next-auth/jwt" {
-  interface JWT { _id?: string; role?: string; permissions?: AdminPermission[]; accessToken?: string }
+  interface JWT { _id?: string; role?: string; permissions?: AdminPermission[]; accessToken?: string; refreshToken?: string }
 }

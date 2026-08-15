@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { AdminPermission, Administrator, Advertisement, ApiResponse, DashboardData, LoginUser, PaginationMeta, User } from "./types";
+import type { AdInquiry, AdminNotificationData, AdminPermission, AdminReview, Administrator, Advertisement, ApiResponse, AuditLog, Category, DashboardData, LoginUser, PaginationMeta, PlatformSettings, User } from "./types";
 
 const configuredUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://187.77.187.56:5056";
 const serverBaseURL = configuredUrl.replace(/\/$/, "").endsWith("/api/v1")
@@ -21,6 +21,11 @@ api.interceptors.request.use(async (config) => {
 export async function loginApi(payload: { email: string; password: string }) {
   const { data } = await api.post<ApiResponse<LoginUser>>("/auth/login", payload);
   return data.data;
+}
+
+export async function refreshAccessTokenApi(refreshToken: string) {
+  const { data } = await api.post<ApiResponse<{ accessToken: string }>>("/auth/refresh-token", { refreshToken });
+  return data.data.accessToken;
 }
 
 export async function forgotPasswordApi(email: string) {
@@ -48,7 +53,12 @@ export async function getDashboard() {
   return data.data;
 }
 
-export async function getUsers(params: { type: string; page: number; limit: number }) {
+export async function getOptions() {
+  const { data } = await api.get<ApiResponse<{ skills: string[]; travelRanges: string[]; rateUnits: string[] }>>("/options");
+  return data.data;
+}
+
+export async function getUsers(params: { type: string; page: number; limit: number; search?: string; verificationStatus?: string }) {
   const { data } = await api.get<ApiResponse<User[]>>("/admin/users", { params });
   return { users: data.data, meta: data.meta as PaginationMeta };
 }
@@ -73,9 +83,39 @@ export async function createVip(payload: VipPayload) {
   return data;
 }
 
-export async function updateVerification(profileId: string, status: "verified" | "rejected") {
-  const { data } = await api.put<ApiResponse<unknown>>(`/admin/tradesman/${profileId}/verification`, { status });
+export async function updateVerification(profileId: string, status: "verified" | "rejected", reason = "") {
+  const { data } = await api.put<ApiResponse<unknown>>(`/admin/tradesman/${profileId}/verification`, { status, reason });
   return data;
+}
+
+export async function bulkUserAction(payload: { ids: string[]; action: "verify" | "reject" | "block" | "unblock" | "delete"; reason?: string }) {
+  const { data } = await api.post<ApiResponse<{ affected: number }>>("/admin/users/bulk", payload);
+  return data;
+}
+
+export async function bulkVerificationAction(payload: { ids: string[]; action: "verify" | "reject"; reason?: string }) {
+  const { data } = await api.post<ApiResponse<{ affected: number }>>("/admin/verification/bulk", payload);
+  return data;
+}
+
+export async function exportUsers(params: { type: string; search?: string }) {
+  const response = await api.get("/admin/export/users", { params, responseType: "blob" });
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `users-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function exportReviews() {
+  const response = await api.get("/admin/export/reviews", { responseType: "blob" });
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `reviews-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export async function getAdvertisements() {
@@ -83,12 +123,12 @@ export async function getAdvertisements() {
   return data.data;
 }
 
-export async function createAdvertisement(payload: Pick<Advertisement, "title" | "description">) {
+export async function createAdvertisement(payload: FormData) {
   const { data } = await api.post<ApiResponse<Advertisement>>("/admin/advertisements", payload);
   return data;
 }
 
-export async function updateAdvertisement(id: string, payload: Partial<Pick<Advertisement, "title" | "description" | "isActive">>) {
+export async function updateAdvertisement(id: string, payload: FormData | Partial<Pick<Advertisement, "title" | "description" | "isActive">>) {
   const { data } = await api.patch<ApiResponse<Advertisement>>(`/admin/advertisements/${id}`, payload);
   return data;
 }
@@ -138,5 +178,60 @@ export async function updateAdministrator(
   payload: { role?: "admin" | "super-admin"; permissions?: AdminPermission[]; isBlocked?: boolean },
 ) {
   const { data } = await api.patch<ApiResponse<Administrator>>(`/admin/administrators/${adminId}`, payload);
+  return data;
+}
+
+export async function getCategoriesAdmin() {
+  const { data } = await api.get<ApiResponse<Category[]>>("/admin/categories");
+  return data.data;
+}
+
+export async function createCategory(payload: { name: string; icon?: string; order?: number }) {
+  const { data } = await api.post<ApiResponse<Category>>("/admin/categories", payload);
+  return data;
+}
+
+export async function updateCategory(id: string, payload: Partial<Pick<Category, "name" | "icon" | "order" | "isActive">>) {
+  const { data } = await api.patch<ApiResponse<Category>>(`/admin/categories/${id}`, payload);
+  return data;
+}
+
+export async function getPlatformSettings() {
+  const { data } = await api.get<ApiResponse<PlatformSettings>>("/admin/platform-settings");
+  return data.data;
+}
+
+export async function updatePlatformSettings(payload: Pick<PlatformSettings, "vipSlotsPerCategory" | "sponsoredRotation" | "reviewModerationMode">) {
+  const { data } = await api.patch<ApiResponse<PlatformSettings>>("/admin/platform-settings", payload);
+  return data;
+}
+
+export async function getAuditLogs(params: { page: number; limit: number; search?: string; action?: string }) {
+  const { data } = await api.get<ApiResponse<AuditLog[]>>("/admin/audit-logs", { params });
+  return { logs: data.data, meta: data.meta as PaginationMeta };
+}
+
+export async function getNotifications() {
+  const { data } = await api.get<ApiResponse<AdminNotificationData>>("/admin/notifications");
+  return data.data;
+}
+
+export async function getReviewsAdmin(params: { page: number; limit: number; status?: string }) {
+  const { data } = await api.get<ApiResponse<AdminReview[]>>("/admin/reviews", { params });
+  return { reviews: data.data, meta: data.meta as PaginationMeta };
+}
+
+export async function moderateReview(id: string, payload: { status: "approved" | "rejected"; note?: string }) {
+  const { data } = await api.patch<ApiResponse<AdminReview>>(`/admin/reviews/${id}`, payload);
+  return data;
+}
+
+export async function getAdInquiries() {
+  const { data } = await api.get<ApiResponse<AdInquiry[]>>("/admin/advertisement-inquiries");
+  return data.data;
+}
+
+export async function updateAdInquiry(id: string, status: AdInquiry["status"]) {
+  const { data } = await api.patch<ApiResponse<AdInquiry>>(`/admin/advertisement-inquiries/${id}`, { status });
   return data;
 }
