@@ -61,6 +61,8 @@ export default function VerificationPage() {
     setSelected([]);
     client.invalidateQueries({ queryKey: ["verification"] });
     client.invalidateQueries({ queryKey: ["notifications"] });
+    client.invalidateQueries({ queryKey: ["users"] });
+    client.invalidateQueries({ queryKey: ["dashboard"] });
   };
   const single = useMutation({
     mutationFn: ({
