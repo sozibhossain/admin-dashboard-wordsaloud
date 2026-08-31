@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { AdInquiry, AdminNotificationData, AdminPermission, AdminReview, Administrator, Advertisement, ApiResponse, AuditLog, Category, DashboardData, LoginUser, PaginationMeta, PlatformSettings, User } from "./types";
+import type { AdInquiry, AdminInvitation, AdminNotificationData, AdminPermission, AdminReview, Administrator, Advertisement, ApiResponse, AuditLog, Category, DashboardData, LoginUser, PaginationMeta, PlatformSettings, User } from "./types";
 
 const configuredUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://187.77.187.56:5056";
 const serverBaseURL = configuredUrl.replace(/\/$/, "").endsWith("/api/v1")
@@ -159,17 +159,36 @@ export async function getAdministrators() {
 }
 
 export type AdministratorPayload = {
-  firstName: string;
-  lastName: string;
   email: string;
-  phoneNumber?: string;
-  password: string;
-  role: "admin" | "super-admin";
-  permissions: AdminPermission[];
 };
 
 export async function createAdministrator(payload: AdministratorPayload) {
-  const { data } = await api.post<ApiResponse<Administrator>>("/admin/administrators", payload);
+  const { data } = await api.post<ApiResponse<AdminInvitation>>("/admin/administrators", payload);
+  return data;
+}
+
+export async function getAdministratorInvitations() {
+  const { data } = await api.get<ApiResponse<AdminInvitation[]>>("/admin/administrator-invitations");
+  return data.data;
+}
+
+export async function resendAdministratorInvitation(invitationId: string) {
+  const { data } = await api.post<ApiResponse<AdminInvitation>>(`/admin/administrator-invitations/${invitationId}/resend`);
+  return data;
+}
+
+export async function revokeAdministratorInvitation(invitationId: string) {
+  const { data } = await api.delete<ApiResponse<AdminInvitation>>(`/admin/administrator-invitations/${invitationId}`);
+  return data;
+}
+
+export async function validateAdministratorInvitation(token: string) {
+  const { data } = await api.get<ApiResponse<{ email: string; expiresAt: string }>>("/auth/admin-invitations/validate", { params: { token } });
+  return data.data;
+}
+
+export async function acceptAdministratorInvitation(payload: { token: string; password: string; confirmPassword: string }) {
+  const { data } = await api.post<ApiResponse<{ email: string }>>("/auth/admin-invitations/accept", payload);
   return data;
 }
 

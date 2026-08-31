@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export const proxy = auth((request) => {
   const authenticated = Boolean(request.auth?.user);
-  const onAuthPage = ["/login", "/forgot-password", "/verify-email", "/reset-password"].some((path) =>
+  const onAuthPage = ["/login", "/forgot-password", "/verify-email", "/reset-password", "/accept-admin-invite"].some((path) =>
     request.nextUrl.pathname.startsWith(path),
   );
   if (!authenticated && !onAuthPage) return NextResponse.redirect(new URL("/login", request.url));

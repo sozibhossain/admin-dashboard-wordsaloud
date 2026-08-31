@@ -25,6 +25,37 @@ import { errorMessage } from "@/lib/utils";
 const localDateTime = (value?: string | null) =>
   value ? new Date(value).toISOString().slice(0, 16) : "";
 
+async function validateAdvertisementMedia(file: File) {
+  if (!file.size) return;
+  if (file.size > 20 * 1024 * 1024) throw new Error("Media must be 20 MB or smaller");
+  if (!["image/jpeg", "image/png", "video/mp4"].includes(file.type)) throw new Error("Media must be a JPG, PNG, or MP4 file");
+  const url = URL.createObjectURL(file);
+  try {
+    if (file.type === "video/mp4") {
+      const duration = await new Promise<number>((resolve, reject) => {
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.onloadedmetadata = () => resolve(video.duration);
+        video.onerror = () => reject(new Error("The selected video could not be read"));
+        video.src = url;
+      });
+      if (duration > 15) throw new Error("Video must be 15 seconds or shorter");
+      return;
+    }
+    const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = () => reject(new Error("The selected image could not be read"));
+      image.src = url;
+    });
+    if (dimensions.width < 600 || dimensions.height < 338 || Math.abs(dimensions.width / dimensions.height - 16 / 9) > 0.03) {
+      throw new Error("Image must be at least 600×338 pixels and use a 16:9 aspect ratio");
+    }
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 function AdDialog({
   open,
   onOpenChange,
@@ -55,11 +86,17 @@ function AdDialog({
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    form.set("categories", JSON.stringify(selectedCategories));
-    mutation.mutate(form);
+    try {
+      const media = form.get("media");
+      if (media instanceof File) await validateAdvertisementMedia(media);
+      form.set("categories", JSON.stringify(selectedCategories));
+      mutation.mutate(form);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -106,6 +143,7 @@ function AdDialog({
                 accept="image/jpeg,image/png,video/mp4"
                 required={!advertisement?.media?.url}
               />
+              <span className="mt-2 block text-xs font-normal leading-5 text-muted">JPG/PNG: minimum 600×338 and 16:9. MP4: maximum 15 seconds. Maximum file size: 20 MB.</span>
             </Field>
             <Field label="Priority">
               <Input
@@ -362,6 +400,8 @@ export default function AdvertisementsPage() {
                         controls
                       />
                     ) : (
+                      // Runtime campaign URLs can come from the configured media provider.
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={ad.media.url}
                         alt=""

@@ -88,8 +88,8 @@ export type User = {
 
 export type Administrator = {
   _id: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   name?: string;
   email: string;
   phoneNumber?: string;
@@ -98,6 +98,16 @@ export type Administrator = {
   isBlocked: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AdminInvitation = {
+  _id: string;
+  email: string;
+  status: "pending" | "expired" | "revoked" | "accepted";
+  expiresAt: string;
+  createdAt?: string;
+  acceptUrl?: string;
+  invitedBy?: { firstName?: string; lastName?: string; email: string };
 };
 
 export type DashboardData = {
@@ -132,6 +142,8 @@ export type Category = {
   order: number;
   isActive: boolean;
   tradesmanCount: number;
+  isNew?: boolean;
+  newUntil?: string | null;
 };
 
 export type PlatformSettings = {

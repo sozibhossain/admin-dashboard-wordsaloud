@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Pencil, Plus, ShieldCheck, ShieldOff, UserCog } from "lucide-react";
+import { Check, Mail, Pencil, Plus, RefreshCw, ShieldCheck, ShieldOff, Trash2, UserCog } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -13,10 +13,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   createAdministrator,
   getAdministrators,
+  getAdministratorInvitations,
+  resendAdministratorInvitation,
+  revokeAdministratorInvitation,
   updateAdministrator,
   type AdministratorPayload,
 } from "@/lib/api";
-import type { AdminPermission, Administrator } from "@/lib/types";
+import type { AdminInvitation, AdminPermission, Administrator } from "@/lib/types";
 import { cn, errorMessage, initials } from "@/lib/utils";
 
 const permissionOptions: { value: AdminPermission; label: string; description: string }[] = [
@@ -69,13 +72,16 @@ function PermissionPicker({
 
 function CreateAdminDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const client = useQueryClient();
-  const [role, setRole] = useState<"admin" | "super-admin">("admin");
-  const [permissions, setPermissions] = useState<AdminPermission[]>(["dashboard"]);
   const mutation = useMutation({
     mutationFn: createAdministrator,
     onSuccess: (response) => {
-      toast.success(response.message);
-      client.invalidateQueries({ queryKey: ["administrators"] });
+      if (response.data.acceptUrl && navigator.clipboard) {
+        void navigator.clipboard.writeText(response.data.acceptUrl).catch(() => undefined);
+        toast.success(`${response.message}. Development accept link copied`);
+      } else {
+        toast.success(response.message);
+      }
+      client.invalidateQueries({ queryKey: ["administrator-invitations"] });
       onOpenChange(false);
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -84,33 +90,18 @@ function CreateAdminDialog({ open, onOpenChange }: { open: boolean; onOpenChange
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const payload: AdministratorPayload = {
-      firstName: String(form.get("firstName") || ""),
-      lastName: String(form.get("lastName") || ""),
-      email: String(form.get("email") || ""),
-      phoneNumber: String(form.get("phoneNumber") || ""),
-      password: String(form.get("password") || ""),
-      role,
-      permissions: role === "super-admin" ? allPermissions : permissions,
-    };
+    const payload: AdministratorPayload = { email: String(form.get("email") || "") };
     mutation.mutate(payload);
   }
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent>
-      <DialogTitle>Create administrator</DialogTitle>
-      <DialogDescription className="mt-1 text-sm text-muted">Create a private dashboard account. There is no public admin sign-up.</DialogDescription>
+      <DialogTitle>Invite administrator</DialogTitle>
+      <DialogDescription className="mt-1 text-sm text-muted">We will email a secure, single-use link. The recipient verifies ownership by opening it and setting their own password.</DialogDescription>
       <form onSubmit={submit} className="mt-6 space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="First name"><Input name="firstName" required /></Field>
-          <Field label="Last name"><Input name="lastName" required /></Field>
-          <Field label="Email address"><Input name="email" type="email" autoComplete="off" required /></Field>
-          <Field label="Phone (optional)"><Input name="phoneNumber" type="tel" /></Field>
-          <Field label="Initial password"><Input name="password" type="password" minLength={8} autoComplete="new-password" required /></Field>
-          <Field label="Role"><select className="form-control" value={role} onChange={(event) => setRole(event.target.value as "admin" | "super-admin")}><option value="admin">Admin</option><option value="super-admin">Super-admin</option></select></Field>
-        </div>
-        <PermissionPicker role={role} permissions={permissions} onChange={setPermissions} />
-        <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button disabled={mutation.isPending}>{mutation.isPending ? "Creating..." : "Create admin"}</Button></div>
+        <Field label="Email address"><div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={18} /><Input name="email" type="email" autoComplete="off" required className="pl-11" placeholder="new.admin@example.com" /></div></Field>
+        <p className="rounded-md bg-brand-soft p-3 text-xs leading-5 text-muted">Invited accounts start as administrators with dashboard-only access. After activation, you can assign additional permissions from this page.</p>
+        <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button disabled={mutation.isPending}>{mutation.isPending ? "Sending..." : "Send invitation"}</Button></div>
       </form>
     </DialogContent>
   </Dialog>;
@@ -151,18 +142,23 @@ export default function AdministratorsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Administrator | null>(null);
   const query = useQuery({ queryKey: ["administrators"], queryFn: getAdministrators });
+  const invitations = useQuery({ queryKey: ["administrator-invitations"], queryFn: getAdministratorInvitations });
   const access = useMutation({
     mutationFn: ({ admin, isBlocked }: { admin: Administrator; isBlocked: boolean }) => updateAdministrator(admin._id, { isBlocked }),
     onSuccess: (response) => { toast.success(response.message); client.invalidateQueries({ queryKey: ["administrators"] }); },
     onError: (error) => toast.error(errorMessage(error)),
   });
+  const resend = useMutation({ mutationFn: resendAdministratorInvitation, onSuccess: (response) => { toast.success(response.message); client.invalidateQueries({ queryKey: ["administrator-invitations"] }); }, onError: (error) => toast.error(errorMessage(error)) });
+  const revoke = useMutation({ mutationFn: revokeAdministratorInvitation, onSuccess: (response) => { toast.success(response.message); client.invalidateQueries({ queryKey: ["administrator-invitations"] }); }, onError: (error) => toast.error(errorMessage(error)) });
 
   return <>
     <PageHeading title="Admin Management" />
     <section className="mb-5 flex flex-col gap-4 rounded-lg border border-black/5 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div><h2 className="flex items-center gap-2 font-bold"><ShieldCheck className="text-brand" size={20} />Secure administrator access</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-muted">Create administrator accounts, assign only the permissions they need, or revoke access. This section is visible only to super-admins.</p></div>
-      <Button className="shrink-0" onClick={() => setCreateOpen(true)}><Plus size={17} />Add administrator</Button>
+      <Button className="shrink-0" onClick={() => setCreateOpen(true)}><Plus size={17} />Invite administrator</Button>
     </section>
+
+    <InvitationList invitations={invitations.data || []} loading={invitations.isLoading} error={invitations.error} pending={resend.isPending || revoke.isPending} onResend={(invitation) => resend.mutate(invitation._id)} onRevoke={(invitation) => { if (confirm(`Revoke the invitation for ${invitation.email}?`)) revoke.mutate(invitation._id); }} />
 
     <section className="overflow-hidden rounded-lg border border-black/5 bg-white shadow-sm">
       {query.isLoading ? <div className="space-y-2 p-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-20" />)}</div> : query.isError ? <p className="p-10 text-center text-sm text-red-600">{errorMessage(query.error)}</p> : <>
@@ -174,6 +170,11 @@ export default function AdministratorsPage() {
     <CreateAdminDialog open={createOpen} onOpenChange={setCreateOpen} />
     <EditAdminDialog key={editing?._id || "closed"} admin={editing} onOpenChange={(open) => !open && setEditing(null)} />
   </>;
+}
+
+function InvitationList({ invitations, loading, error, pending, onResend, onRevoke }: { invitations: AdminInvitation[]; loading: boolean; error: unknown; pending: boolean; onResend: (invitation: AdminInvitation) => void; onRevoke: (invitation: AdminInvitation) => void }) {
+  if (!loading && !error && !invitations.length) return null;
+  return <section className="mb-5 overflow-hidden rounded-lg border border-black/5 bg-white shadow-sm"><div className="border-b border-black/5 px-5 py-4"><h2 className="font-bold">Pending invitations</h2><p className="mt-1 text-xs text-muted">Invitation links are single-use and expire automatically.</p></div>{loading ? <div className="space-y-2 p-4"><Skeleton className="h-16" /><Skeleton className="h-16" /></div> : error ? <p className="p-6 text-sm text-red-600">{errorMessage(error)}</p> : <div className="divide-y divide-black/5">{invitations.map((invitation) => <article key={invitation._id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{invitation.email}</p><p className="mt-1 text-xs text-muted"><span className="capitalize">{invitation.status}</span> · Expires {new Date(invitation.expiresAt).toLocaleString()}</p></div><div className="flex gap-2"><Button size="sm" variant="outline" disabled={pending} onClick={() => onResend(invitation)}><RefreshCw size={14} />Resend</Button><Button size="sm" variant="danger" disabled={pending} onClick={() => onRevoke(invitation)}><Trash2 size={14} />Revoke</Button></div></article>)}</div>}</section>;
 }
 
 function AdminIdentity({ admin }: { admin: Administrator }) {
