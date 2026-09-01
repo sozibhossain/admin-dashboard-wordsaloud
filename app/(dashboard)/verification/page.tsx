@@ -6,7 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { CheckCircle2, Search, XCircle } from "lucide-react";
+import { CheckCircle2, Search, Trash2, XCircle } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { PageHeading } from "@/components/page-heading";
@@ -22,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   bulkVerificationAction,
+  bulkUserAction,
+  deleteUser,
   getUsers,
   updateVerification,
 } from "@/lib/api";
@@ -95,6 +97,9 @@ export default function VerificationPage() {
     onError: (error) => toast.error(errorMessage(error)),
   });
   const rows = query.data?.users || [];
+  const remove = useMutation({ mutationFn: deleteUser, onSuccess: (response) => { toast.success(response.message); refresh(); }, onError: (error) => toast.error(errorMessage(error)) });
+  const selectedUserIds = rows.filter((user) => selected.includes(user.tradesmanProfile!._id)).map((user) => user._id);
+  const bulkRemove = useMutation({ mutationFn: () => bulkUserAction({ ids: selectedUserIds, action: "delete" }), onSuccess: (response) => { toast.success(response.message); refresh(); }, onError: (error) => toast.error(errorMessage(error)) });
   const allSelected =
     rows.length > 0 &&
     rows.every((user) => selected.includes(user.tradesmanProfile!._id));
@@ -167,6 +172,7 @@ export default function VerificationPage() {
               <XCircle size={15} />
               Reject {selected.length}
             </Button>
+            <Button size="sm" variant="danger" disabled={bulkRemove.isPending} onClick={() => { if (confirm(`Permanently delete ${selectedUserIds.length} selected tradesman accounts?`)) bulkRemove.mutate(); }}><Trash2 size={15} />Delete {selectedUserIds.length}</Button>
           </div>
         )}
       </section>
@@ -269,6 +275,7 @@ export default function VerificationPage() {
                               <XCircle size={14} />
                               Reject
                             </Button>
+                            <Button size="sm" variant="danger" disabled={remove.isPending} onClick={() => { if (confirm(`Permanently delete ${nameOf(user)}?`)) remove.mutate(user._id); }}><Trash2 size={14} />Delete</Button>
                           </div>
                         </td>
                       </tr>
@@ -287,7 +294,7 @@ export default function VerificationPage() {
               totalPages={query.data?.meta.totalPages || 1}
               total={query.data?.meta.total || 0}
               pageSize={limit}
-              onPage={setPage}
+              onPage={(nextPage) => { setPage(nextPage); setSelected([]); }}
             />
           </>
         )}

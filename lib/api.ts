@@ -138,6 +138,11 @@ export async function deleteAdvertisement(id: string) {
   return data;
 }
 
+export async function bulkDeleteAdvertisements(ids: string[]) {
+  const { data } = await api.post<ApiResponse<{ affected: number }>>("/admin/advertisements/bulk-delete", { ids });
+  return data;
+}
+
 export async function getProfile() {
   const { data } = await api.get<ApiResponse<User>>("/user/me");
   return data.data;
@@ -205,6 +210,11 @@ export async function getCategoriesAdmin() {
   return data.data;
 }
 
+export async function getCategoriesAdminPage(params: { page: number; limit: number }) {
+  const { data } = await api.get<ApiResponse<Category[]>>("/admin/categories", { params });
+  return { categories: data.data, meta: data.meta as PaginationMeta };
+}
+
 export async function createCategory(payload: { name: string; icon?: string; order?: number }) {
   const { data } = await api.post<ApiResponse<Category>>("/admin/categories", payload);
   return data;
@@ -212,6 +222,16 @@ export async function createCategory(payload: { name: string; icon?: string; ord
 
 export async function updateCategory(id: string, payload: Partial<Pick<Category, "name" | "icon" | "order" | "isActive">>) {
   const { data } = await api.patch<ApiResponse<Category>>(`/admin/categories/${id}`, payload);
+  return data;
+}
+
+export async function deleteCategory(id: string) {
+  const { data } = await api.delete<ApiResponse<{ affected: number }>>(`/admin/categories/${id}`);
+  return data;
+}
+
+export async function bulkDeleteCategories(ids: string[]) {
+  const { data } = await api.post<ApiResponse<{ affected: number }>>("/admin/categories/bulk-delete", { ids });
   return data;
 }
 
@@ -230,6 +250,16 @@ export async function getAuditLogs(params: { page: number; limit: number; search
   return { logs: data.data, meta: data.meta as PaginationMeta };
 }
 
+export async function deleteAuditLog(id: string) {
+  const { data } = await api.delete<ApiResponse<{ affected: number }>>(`/admin/audit-logs/${id}`);
+  return data;
+}
+
+export async function bulkDeleteAuditLogs(ids: string[]) {
+  const { data } = await api.post<ApiResponse<{ affected: number }>>("/admin/audit-logs/bulk-delete", { ids });
+  return data;
+}
+
 export async function getNotifications() {
   const { data } = await api.get<ApiResponse<AdminNotificationData>>("/admin/notifications");
   return data.data;
@@ -245,6 +275,16 @@ export async function moderateReview(id: string, payload: { status: "approved" |
   return data;
 }
 
+export async function deleteReview(id: string) {
+  const { data } = await api.delete<ApiResponse<{ affected: number }>>(`/admin/reviews/${id}`);
+  return data;
+}
+
+export async function bulkDeleteReviews(ids: string[]) {
+  const { data } = await api.post<ApiResponse<{ affected: number }>>("/admin/reviews/bulk-delete", { ids });
+  return data;
+}
+
 export async function getAdInquiries() {
   const { data } = await api.get<ApiResponse<AdInquiry[]>>("/admin/advertisement-inquiries");
   return data.data;
@@ -252,5 +292,30 @@ export async function getAdInquiries() {
 
 export async function updateAdInquiry(id: string, status: AdInquiry["status"]) {
   const { data } = await api.patch<ApiResponse<AdInquiry>>(`/admin/advertisement-inquiries/${id}`, { status });
+  return data;
+}
+
+export async function deleteAdInquiry(id: string) {
+  const { data } = await api.delete<ApiResponse<{ affected: number }>>(`/admin/advertisement-inquiries/${id}`);
+  return data;
+}
+
+export async function bulkDeleteAdInquiries(ids: string[]) {
+  const { data } = await api.post<ApiResponse<{ affected: number }>>("/admin/advertisement-inquiries/bulk-delete", { ids });
+  return data;
+}
+
+export async function deleteAdministrator(id: string) {
+  const { data } = await api.delete<ApiResponse<{ affected: number }>>(`/admin/administrators/${id}`);
+  return data;
+}
+
+export async function bulkDeleteAdministrators(ids: string[]) {
+  const { data } = await api.post<ApiResponse<{ affected: number }>>("/admin/administrators/bulk-delete", { ids });
+  return data;
+}
+
+export async function bulkRevokeAdministratorInvitations(ids: string[]) {
+  const { data } = await api.post<ApiResponse<{ affected: number }>>("/admin/administrator-invitations/bulk-delete", { ids });
   return data;
 }

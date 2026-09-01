@@ -11,7 +11,10 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  bulkDeleteAdInquiries,
+  bulkDeleteAdvertisements,
   createAdvertisement,
+  deleteAdInquiry,
   deleteAdvertisement,
   getAdInquiries,
   getAdvertisements,
@@ -269,6 +272,9 @@ export default function AdvertisementsPage() {
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Advertisement | null>(null);
+  const [selectedAds, setSelectedAds] = useState<string[]>([]);
+  const [selectedInquiries, setSelectedInquiries] = useState<string[]>([]);
+  const [inquiryPage, setInquiryPage] = useState(1);
   const pageSize = 9;
   const query = useQuery({
     queryKey: ["advertisements"],
@@ -283,6 +289,15 @@ export default function AdvertisementsPage() {
     mutationFn: deleteAdvertisement,
     onSuccess: (response) => {
       toast.success(response.message);
+      client.invalidateQueries({ queryKey: ["advertisements"] });
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+  const bulkRemove = useMutation({
+    mutationFn: () => bulkDeleteAdvertisements(selectedAds),
+    onSuccess: (response) => {
+      toast.success(response.message);
+      setSelectedAds([]);
       client.invalidateQueries({ queryKey: ["advertisements"] });
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -310,6 +325,23 @@ export default function AdvertisementsPage() {
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
+  const removeInquiry = useMutation({
+    mutationFn: deleteAdInquiry,
+    onSuccess: (response) => {
+      toast.success(response.message);
+      client.invalidateQueries({ queryKey: ["ad-inquiries"] });
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+  const bulkRemoveInquiries = useMutation({
+    mutationFn: () => bulkDeleteAdInquiries(selectedInquiries),
+    onSuccess: (response) => {
+      toast.success(response.message);
+      setSelectedInquiries([]);
+      client.invalidateQueries({ queryKey: ["ad-inquiries"] });
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
   const filtered = (query.data || []).filter(
     (ad) =>
       filter === "all" || (filter === "active" ? ad.isActive : !ad.isActive),
@@ -317,6 +349,13 @@ export default function AdvertisementsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const ads = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const allAdsSelected = ads.length > 0 && ads.every((ad) => selectedAds.includes(ad._id));
+  const inquiryPageSize = 10;
+  const allInquiries = inquiries.data || [];
+  const inquiryTotalPages = Math.max(1, Math.ceil(allInquiries.length / inquiryPageSize));
+  const safeInquiryPage = Math.min(inquiryPage, inquiryTotalPages);
+  const inquiryRows = allInquiries.slice((safeInquiryPage - 1) * inquiryPageSize, safeInquiryPage * inquiryPageSize);
+  const allInquiriesSelected = inquiryRows.length > 0 && inquiryRows.every((inquiry) => selectedInquiries.includes(inquiry._id));
   return (
     <>
       <div className="flex flex-wrap items-start gap-3">
@@ -359,13 +398,13 @@ export default function AdvertisementsPage() {
       </div>
       <div className="mb-5 flex gap-2">
         <button
-          onClick={() => setTab("campaigns")}
+          onClick={() => { setTab("campaigns"); setSelectedInquiries([]); }}
           className={`rounded-full px-4 py-2 text-sm font-semibold ${tab === "campaigns" ? "bg-brand text-white" : "bg-white"}`}
         >
           Campaigns
         </button>
         <button
-          onClick={() => setTab("inquiries")}
+          onClick={() => { setTab("inquiries"); setSelectedAds([]); }}
           className={`rounded-full px-4 py-2 text-sm font-semibold ${tab === "inquiries" ? "bg-brand text-white" : "bg-white"}`}
         >
           Advertiser Inquiries
@@ -384,6 +423,7 @@ export default function AdvertisementsPage() {
           </p>
         ) : (
           <>
+            {ads.length > 0 && <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-white p-3 shadow-sm"><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={allAdsSelected} onChange={() => setSelectedAds(allAdsSelected ? [] : ads.map((ad) => ad._id))} />Select all on this page</label>{selectedAds.length > 0 && <Button className="ml-auto" size="sm" variant="danger" disabled={bulkRemove.isPending} onClick={() => { if (confirm(`Delete ${selectedAds.length} selected advertisements?`)) bulkRemove.mutate(); }}><Trash2 size={15} />{bulkRemove.isPending ? "Deleting..." : `Delete ${selectedAds.length}`}</Button>}</div>}
             <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {ads.map((ad) => (
                 <article
@@ -410,7 +450,7 @@ export default function AdvertisementsPage() {
                     ))}
                   <div className="p-5">
                     <div className="flex items-start justify-between gap-3">
-                      <h2 className="font-bold">{ad.title}</h2>
+                      <div className="flex min-w-0 items-start gap-3"><input type="checkbox" className="mt-1" checked={selectedAds.includes(ad._id)} onChange={() => setSelectedAds((current) => current.includes(ad._id) ? current.filter((id) => id !== ad._id) : [...current, ad._id])} aria-label={`Select ${ad.title}`} /><h2 className="font-bold">{ad.title}</h2></div>
                       <div className="flex gap-2">
                         <button
                           title="Edit advertisement"
@@ -461,7 +501,7 @@ export default function AdvertisementsPage() {
                 totalPages={totalPages}
                 total={filtered.length}
                 pageSize={pageSize}
-                onPage={setPage}
+                onPage={(nextPage) => { setPage(nextPage); setSelectedAds([]); }}
               />
             </div>
           </>
@@ -475,20 +515,25 @@ export default function AdvertisementsPage() {
               {errorMessage(inquiries.error)}
             </p>
           ) : (
+            <>
+            {selectedInquiries.length > 0 && <div className="flex justify-end border-b border-black/5 p-3"><Button size="sm" variant="danger" disabled={bulkRemoveInquiries.isPending} onClick={() => { if (confirm(`Delete ${selectedInquiries.length} selected inquiries?`)) bulkRemoveInquiries.mutate(); }}><Trash2 size={15} />{bulkRemoveInquiries.isPending ? "Deleting..." : `Delete ${selectedInquiries.length}`}</Button></div>}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px]">
                 <thead className="bg-brand-soft text-left text-xs uppercase">
                   <tr>
+                    <th className="w-12 px-5 py-4"><input type="checkbox" checked={allInquiriesSelected} onChange={() => setSelectedInquiries(allInquiriesSelected ? [] : inquiryRows.map((inquiry) => inquiry._id))} aria-label="Select all inquiries on this page" /></th>
                     <th className="px-5 py-4">Business</th>
                     <th className="px-4 py-4">WhatsApp</th>
                     <th className="px-4 py-4">Categories</th>
                     <th className="px-4 py-4">Received</th>
                     <th className="px-5 py-4">Status</th>
+                    <th className="px-5 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {inquiries.data?.map((inquiry) => (
+                  {inquiryRows.map((inquiry) => (
                     <tr key={inquiry._id} className="border-b border-black/5">
+                      <td className="px-5 py-4"><input type="checkbox" checked={selectedInquiries.includes(inquiry._id)} onChange={() => setSelectedInquiries((current) => current.includes(inquiry._id) ? current.filter((id) => id !== inquiry._id) : [...current, inquiry._id])} aria-label={`Select ${inquiry.businessName}`} /></td>
                       <td className="px-5 py-4 font-semibold">
                         {inquiry.businessName}
                       </td>
@@ -516,11 +561,15 @@ export default function AdvertisementsPage() {
                           <option value="closed">Closed</option>
                         </select>
                       </td>
+                      <td className="px-5 py-4 text-right"><Button size="sm" variant="danger" disabled={removeInquiry.isPending} onClick={() => { if (confirm(`Delete the inquiry from ${inquiry.businessName}?`)) removeInquiry.mutate(inquiry._id); }}><Trash2 size={14} />Delete</Button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {!inquiryRows.length && <p className="p-12 text-center text-sm text-muted">No advertiser inquiries found.</p>}
+            <Pagination page={safeInquiryPage} totalPages={inquiryTotalPages} total={allInquiries.length} pageSize={inquiryPageSize} onPage={(nextPage) => { setInquiryPage(nextPage); setSelectedInquiries([]); }} />
+            </>
           )}
         </section>
       )}
